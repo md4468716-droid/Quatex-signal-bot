@@ -1,4 +1,4 @@
-const C = "fx-signal-v1";
+concononj C = "fx-signal-v1";
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(C).then(c => c.addAll(["./", "./index.html", "./manifest.json"])));
   self.skipWaiting();
