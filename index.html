@@ -35,6 +35,11 @@ select,input{width:100%;background:#0e1626;color:var(--tx);border:1px solid var(
 .tag{font-size:12px;padding:2px 8px;border-radius:8px;border:1px solid var(--line);color:var(--mu)}
 .warn{font-size:12.5px;color:#f5c26b;line-height:1.5;margin-top:14px}
 .hidden{display:none}
+.item{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.item:last-child{border:0}
+.side{font-weight:800;font-size:18px;padding:6px 12px;border-radius:10px}
+.side.call{color:var(--up);background:rgba(34,197,94,.15)}
+.side.put{color:var(--dn);background:rgba(239,68,68,.15)}
 .err{color:var(--dn);font-size:14px;margin-top:10px}
 .timer{font-variant-numeric:tabular-nums;font-weight:700}
 </style>
@@ -56,7 +61,12 @@ select,input{width:100%;background:#0e1626;color:var(--tx);border:1px solid var(
   <label>Currency pair</label>
   <select id="pair"></select>
   <button class="go" id="go">Signal dao</button>
+  <button class="go" id="scan" style="background:#1f2a44">Scan all pairs (28)</button>
   <div class="err" id="err"></div>
+</div>
+
+<div class="card hidden" id="scanBox">
+  <div id="scanList"></div>
 </div>
 
 <div class="card hidden" id="out">
@@ -122,48 +132,115 @@ async function load(pair,key){
   return v;
 }
 
-// ---------- Main ----------
+// ---------- Analysis ----------
+async function analyze(pair,key){
+  const v=await load(pair,key),c=v.map(x=>x.c);
+  if(c.length<60)throw new Error("Poryapto data nei");
+  const L=c.length-1,sinceClose=(Date.now()-v[L].t)/60000-5;
+  const S=strategies(c),names=Object.keys(S);
+  const e21=ema(c,21),e50=ema(c,50);
+  const trend=e21[L]>e50[L]&&e50[L]>e50[L-5]?1:e21[L]<e50[L]&&e50[L]<e50[L-5]?-1:0;
+  const trig=names.filter(n=>S[n][L]!==0);
+  const sum=trig.reduce((a,n)=>a+S[n][L],0);
+  return {pair,c,v,L,S,names,trend,trig,sum,sinceClose,closed:sinceClose>10};
+}
+
+function render(r){
+  const {pair,c,v,L,S,names,trend,trig,sum}=r;
+  const payout=parseFloat($("payout").value||85)/100,be=1/(1+payout);
+  $("out").classList.remove("hidden");
+  const box=$("sig");box.className="sig none";
+  if(r.closed){
+    $("sigTxt").textContent="BAZAR BONDHO";$("sigSub").textContent="Shesh candle "+Math.round(r.sinceClose)+" minute age-er. Mon-Fri e try koro.";
+  }else if(!trig.length){
+    $("sigTxt").textContent="NO SIGNAL";$("sigSub").textContent="Ekhon kono strategy trigger kore ni. Trade korar dorkar nei.";
+  }else if(sum===0){
+    $("sigTxt").textContent="CONFLICT";$("sigSub").textContent="Strategy-gulo ulte dik dekhachche. Skip koro.";
+  }else{
+    const up=sum>0;box.className="sig "+(up?"call":"put");
+    $("sigTxt").textContent=up?"CALL (UP)":"PUT (DOWN)";
+    $("sigSub").textContent=`${pair} | Expiry 5 min | ${trig.filter(n=>S[n][L]===(up?1:-1)).length}/${names.length} strategy ekmot`;
+  }
+  let rows="";
+  rows+=`<div class="row"><span class="mu">Pair / Price</span><span>${pair} &nbsp; ${c[L].toFixed(c[L]>20?3:5)}</span></div>`;
+  rows+=`<div class="row"><span class="mu">Candle close</span><span>${new Date(v[L].t+300000).toUTCString().slice(17,22)} UTC (${Math.max(0,Math.round(r.sinceClose))} min age)</span></div>`;
+  rows+=`<div class="row"><span class="mu">Trend (EMA)</span><span>${trend>0?"UP":trend<0?"DOWN":"SIDEWAYS"}${trig.length&&sum!==0&&Math.sign(sum)*trend<0?' <span class="tag">trend-er biruddhe</span>':''}</span></div>`;
+  names.forEach(n=>{
+    const s=S[n][L],bt=backtest(S[n],c),wr=bt.n?bt.w/bt.n:0;
+    rows+=`<div class="row"><span>${n}<br><span class="mu" style="font-size:12px">ager ${c.length} candle: ${bt.w}/${bt.n} jit${bt.n?` (${(wr*100).toFixed(0)}%)`:''}</span></span>
+    <span style="color:${s>0?'var(--up)':s<0?'var(--dn)':'var(--mu)'}">${s>0?"CALL":s<0?"PUT":"-"}</span></div>`;
+  });
+  rows+=`<div class="row"><span class="mu">Break-even win rate</span><span>${(be*100).toFixed(1)}%</span></div>`;
+  $("rows").innerHTML=rows;
+}
+
+// ---------- Single pair ----------
 $("go").onclick=async()=>{
   const pair=$("pair").value,key=$("key").value.trim()||LS.get("tdkey","");
   $("err").textContent="";
   if(!key){$("settings").classList.remove("hidden");$("err").textContent="Age API key boshao (Setting).";return}
   $("go").disabled=true;$("go").textContent="Analysis cholche...";
-  try{
-    const v=await load(pair,key),c=v.map(x=>x.c);
-    if(c.length<60)throw new Error("Poryapto data nei");
-    const L=c.length-1,age=(Date.now()-v[L].t)/60000;
-    const S=strategies(c),names=Object.keys(S);
-    const payout=parseFloat($("payout").value||85)/100,be=1/(1+payout);
-    const e21=ema(c,21),e50=ema(c,50);
-    const trend=e21[L]>e50[L]&&e50[L]>e50[L-5]?1:e21[L]<e50[L]&&e50[L]<e50[L-5]?-1:0;
-    const trig=names.filter(n=>S[n][L]!==0);
-    const sum=trig.reduce((a,n)=>a+S[n][L],0);
-    const out=$("out");out.classList.remove("hidden");
-    const box=$("sig");box.className="sig none";
-    let rows="";
-    if(age>15){
-      $("sigTxt").textContent="BAZAR BONDHO";$("sigSub").textContent="Shesh candle "+Math.round(age)+" minute age-er. Mon-Fri e try koro.";
-    }else if(!trig.length){
-      $("sigTxt").textContent="NO SIGNAL";$("sigSub").textContent="Ekhon kono strategy trigger kore ni. Trade korar dorkar nei.";
-    }else if(sum===0){
-      $("sigTxt").textContent="CONFLICT";$("sigSub").textContent="Strategy-gulo ulte dik dekhachche. Skip koro.";
-    }else{
-      const up=sum>0;box.className="sig "+(up?"call":"put");
-      $("sigTxt").textContent=up?"CALL (UP)":"PUT (DOWN)";
-      $("sigSub").textContent=`Expiry 5 min | ${trig.filter(n=>S[n][L]===(up?1:-1)).length}/${names.length} strategy ekmot`;
-    }
-    rows+=`<div class="row"><span class="mu">Pair / Price</span><span>${pair} &nbsp; ${c[L].toFixed(c[L]>20?3:5)}</span></div>`;
-    rows+=`<div class="row"><span class="mu">Candle close</span><span>${new Date(v[L].t+300000).toUTCString().slice(17,22)} UTC</span></div>`;
-    rows+=`<div class="row"><span class="mu">Trend (EMA)</span><span>${trend>0?"UP":trend<0?"DOWN":"SIDEWAYS"}${trig.length&&sum!==0&&Math.sign(sum)*trend<0?' <span class="tag">trend-er biruddhe</span>':''}</span></div>`;
-    names.forEach(n=>{
-      const s=S[n][L],bt=backtest(S[n],c),wr=bt.n?bt.w/bt.n:0;
-      rows+=`<div class="row"><span>${n}<br><span class="mu" style="font-size:12px">ager ${c.length} candle: ${bt.w}/${bt.n} jit${bt.n?` (${(wr*100).toFixed(0)}%)`:''}</span></span>
-      <span style="color:${s>0?'var(--up)':s<0?'var(--dn)':'var(--mu)'}">${s>0?"CALL":s<0?"PUT":"-"}</span></div>`;
-    });
-    rows+=`<div class="row"><span class="mu">Break-even win rate</span><span>${(be*100).toFixed(1)}%</span></div>`;
-    $("rows").innerHTML=rows;
-  }catch(e){$("err").textContent="Error: "+e.message}
+  try{render(await analyze(pair,key))}catch(e){$("err").textContent="Error: "+e.message}
   $("go").disabled=false;$("go").textContent="Signal dao";
+};
+
+// ---------- Scan all pairs ----------
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let scanning=false,stopFlag=false;const results={};
+
+function paintScan(done,errs,note){
+  const all=Object.values(results);
+  const sigs=all.filter(r=>!r.closed&&r.sum!==0)
+    .sort((a,b)=>Math.abs(b.sum)-Math.abs(a.sum)||a.sinceClose-b.sinceClose);
+  const none=all.filter(r=>!r.closed&&r.sum===0&&r.trig.length===0).length;
+  const conf=all.filter(r=>!r.closed&&r.sum===0&&r.trig.length>0).length;
+  let h=`<div class="mu" style="font-size:13px;margin-bottom:8px">${note||""}</div>`;
+  h+=`<div class="mu" style="font-size:13px;margin-bottom:6px">Check hoyeche: ${done}/${PAIRS.length} | Signal: ${sigs.length} | No signal: ${none} | Conflict: ${conf} | Error: ${errs}</div>`;
+  if(!sigs.length)h+=`<div class="mu" style="padding:10px 0">Ekhono kono pair-e signal nei.</div>`;
+  sigs.forEach(r=>{
+    const up=r.sum>0,votes=r.trig.filter(n=>r.S[n][r.L]===(up?1:-1)).length;
+    const late=r.sinceClose>3;
+    h+=`<div class="item" data-p="${r.pair}"><div><b>${r.pair}</b> <span class="tag">trend ${r.trend>0?"UP":r.trend<0?"DOWN":"SIDE"}</span>${late?' <span class="tag" style="color:#f5c26b">LATE</span>':''}<br>
+      <span class="mu" style="font-size:12px">${votes}/${r.names.length} strategy | close ${new Date(r.v[r.L].t+300000).toUTCString().slice(17,22)} UTC, ${Math.max(0,Math.round(r.sinceClose))} min age</span></div>
+      <div class="side ${up?'call':'put'}">${up?"CALL":"PUT"}</div></div>`;
+  });
+  $("scanList").innerHTML=h;
+  document.querySelectorAll(".item").forEach(el=>el.onclick=()=>{
+    const r=results[el.dataset.p];if(!r)return;
+    $("pair").value=r.pair;LS.set("pair",r.pair);render(r);window.scrollTo({top:0,behavior:"smooth"});
+  });
+}
+
+$("scan").onclick=async()=>{
+  if(scanning){stopFlag=true;return}
+  const key=$("key").value.trim()||LS.get("tdkey","");
+  $("err").textContent="";
+  if(!key){$("settings").classList.remove("hidden");$("err").textContent="Age API key boshao (Setting).";return}
+  scanning=true;stopFlag=false;$("scan").textContent="Stop scan";
+  $("scanBox").classList.remove("hidden");
+  Object.keys(results).forEach(k=>delete results[k]);
+  let done=0,errs=0,closed=false,fatal="";
+  for(const p of PAIRS){
+    if(stopFlag)break;
+    paintScan(done,errs,`Scan cholche: ${p} ... (free key-te ~4 minute lagbe)`);
+    let tries=0;
+    while(true){
+      try{const r=await analyze(p,key);results[p]=r;if(r.closed)closed=true;break}
+      catch(e){
+        const m=e.message||"";
+        if(/api ?key|apikey|invalid|unauthor/i.test(m)){fatal="API key thik na: "+m;break}
+        if(/credit|limit|minute/i.test(m)&&tries<2){tries++;paintScan(done,errs,"Limit chhunyeche, 1 minute opekkha...");await sleep(61000);continue}
+        errs++;break;
+      }
+    }
+    if(fatal)break;
+    done++;
+    if(closed)break;
+    if(done<PAIRS.length&&!stopFlag)await sleep(7600);
+  }
+  const note=fatal?fatal:closed?"Bazar bondho (weekend ba chhutir din). Mon-Fri e try koro.":stopFlag?"Scan thamano hoyeche.":"Scan shesh. Signal-er pair-e tap koro. LATE hole candle purono, notun candle-er jonno abar scan koro.";
+  paintScan(done,errs,note);
+  scanning=false;$("scan").textContent="Scan all pairs (28)";
 };
 
 if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").catch(()=>{})}
