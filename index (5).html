@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>FX Signal</title>
+<style>
+:root{--bg:#0b1220;--card:#131c2f;--line:#223049;--tx:#e8eefc;--mu:#8ea0c0;--up:#22c55e;--dn:#ef4444;--ac:#3b82f6;--wn:#f5c26b}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)}
+button,select,input{font:inherit}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px 6px}
+h1{font-size:20px;margin:0}
+.icon{background:none;border:1px solid var(--line);color:var(--mu);border-radius:10px;padding:8px 12px}
+main{flex:1;overflow-y:auto;padding:0 16px 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-top:12px}
+label{display:block;font-size:13px;color:var(--mu);margin-bottom:6px}
+select,input[type=text],input[type=password],input[type=number]{width:100%;background:#0e1626;color:var(--tx);border:1px solid var(--line);border-radius:12px;padding:13px;font-size:16px}
+.go{width:100%;margin-top:10px;background:var(--ac);color:#fff;border:0;border-radius:14px;padding:15px;font-size:17px;font-weight:700}
+.go.g{background:#1f2a44}
+.go.r{background:#7f1d1d}
+.go:disabled{opacity:.5}
+.sig{text-align:center;padding:20px 8px;border-radius:14px}
+.sig .big{font-size:36px;font-weight:800;letter-spacing:1px}
+.sig .sub{font-size:14px;margin-top:6px;opacity:.9}
+.call{background:rgba(34,197,94,.15);color:var(--up);border:1px solid var(--up)}
+.put{background:rgba(239,68,68,.15);color:var(--dn);border:1px solid var(--dn)}
+.none{background:#0e1626;color:var(--mu);border:1px solid var(--line)}
+.row{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+.row:last-child{border:0}
+.mu{color:var(--mu)}.sm{font-size:12px}
+.tag{font-size:11.5px;padding:2px 8px;border-radius:8px;border:1px solid var(--line);color:var(--mu);white-space:nowrap}
+.tag.ok{color:var(--up);border-color:var(--up)}
+.tag.wn{color:var(--wn);border-color:var(--wn)}
+.warn{font-size:12.5px;color:var(--wn);line-height:1.5;margin-top:14px}
+.hidden{display:none!important}
+.err{color:var(--dn);font-size:14px;margin-top:10px}
+.item{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.item:last-child{border:0}
+.side{font-weight:800;font-size:17px;padding:6px 12px;border-radius:10px}
+.side.call{color:var(--up);background:rgba(34,197,94,.15);border:0}
+.side.put{color:var(--dn);background:rgba(239,68,68,.15);border:0}
+nav{display:flex;border-top:1px solid var(--line);background:var(--bg);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;background:none;border:0;color:var(--mu);padding:14px 4px;font-size:14px;font-weight:600}
+nav button.on{color:#fff;box-shadow:inset 0 2px 0 var(--ac)}
+.panel{position:fixed;inset:0;background:var(--bg);z-index:20;overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 16px 30px}
+.chk{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:15px}
+.chk input{width:20px;height:20px;flex:none}
+.grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.pill{display:flex;align-items:center;gap:6px;background:#0e1626;border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-size:13px}
+.pill input{width:16px;height:16px}
+details{border-bottom:1px solid var(--line);padding:10px 0}
+details:last-child{border:0}
+summary{display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;list-style:none}
+summary::-webkit-details-marker{display:none}
+.seg{display:flex;gap:8px;margin-top:6px}
+.seg button{flex:1;padding:12px;border-radius:12px;border:1px solid var(--line);background:#0e1626;color:var(--tx);font-weight:700}
+.seg button.on.call{background:rgba(34,197,94,.25);border-color:var(--up)}
+.seg button.on.put{background:rgba(239,68,68,.25);border-color:var(--dn)}
+.seg button.on.w{background:rgba(34,197,94,.25);border-color:var(--up)}
+.seg button.on.l{background:rgba(239,68,68,.25);border-color:var(--dn)}
+.seg button.on.d{background:#334155}
+.stat{font-size:28px;font-weight:800}
+</style>
+</head>
+<body>
+<header><h1>FX Signal</h1><button class="icon" id="gear">Setting</button></header>
+
+<!-- ============ SIGNAL TAB ============ -->
+<main id="tab-signal">
+  <div class="card" id="riskCard" style="padding:12px 16px"><div id="riskTxt" class="sm" style="white-space:pre-wrap;line-height:1.5"></div></div>
+  <div class="card">
+    <label>Currency pair</label>
+    <select id="pair"></select>
+    <button class="go" id="go">Signal dao</button>
+    <button class="go g" id="scan">Scan all pairs (28)</button>
+    <button class="go g" id="autoBtn">Auto scan: BONDHO</button>
+    <div class="mu sm" id="autoSt" style="margin-top:8px"></div>
+    <div class="mu sm" id="credit" style="margin-top:4px"></div>
+    <div class="err" id="err"></div>
+  </div>
+  <div class="card hidden" id="alertBox"><b>Alert log</b><div id="alertList" style="margin-top:6px"></div></div>
+  <div class="card hidden" id="scanBox"><div id="scanList"></div></div>
+  <div class="card hidden" id="out">
+    <div class="sig none" id="sig"><div class="big" id="sigTxt">-</div><div class="sub" id="sigSub"></div></div>
+    <button class="go g hidden" id="toJournal" style="margin-top:12px">Journal-e likho</button>
+    <button class="go g" id="aiBtn" style="margin-top:8px">AI byakkha (Gemini)</button>
+    <div id="aiBox" style="font-size:14px;line-height:1.55;white-space:pre-wrap;margin-top:10px"></div>
+    <div style="margin-top:10px" id="rows"></div>
+  </div>
+  <div class="warn">Eta shudhu technical analysis, profit-er guarantee na. Age Quotex DEMO-te test koro. Break-even win rate: <b id="be">54%</b>.</div>
+</main>
+
+<!-- ============ BACKTEST TAB ============ -->
+<main id="tab-bt" class="hidden">
+  <div class="card">
+    <b>Boro backtest (5000 candle)</b>
+    <div class="mu sm" style="margin-top:6px;line-height:1.5">Prottek pair-e prai 17 trading din-er data diye 4 ta strategy test hoy. 60% diye shikhe, baki 40% notun data-te dekha hoy. 28 pair-e ~4 minute ar 28 request lage.</div>
+    <button class="go" id="btAll">Backtest all pairs (28)</button>
+    <div class="mu sm" id="btProg" style="margin-top:8px"></div>
+  </div>
+  <div class="card hidden" id="btBox"><div id="btList"></div></div>
+  <div class="warn">PASS = notun data-te win rate break-even-er upore (95% confidence) ar shikhar shomoy-o upore. 28 pair x 4 strategy test hoy, tai kichu PASS shudhu bhaggo-e hote pare. Demo-te proman koro.</div>
+</main>
+
+<!-- ============ JOURNAL TAB ============ -->
+<main id="tab-jr" class="hidden">
+  <div class="card">
+    <b>Trade journal</b>
+    <label style="margin-top:10px">Pair</label><select id="jPair"></select>
+    <label style="margin-top:10px">Dik</label>
+    <div class="seg" id="jDir"><button data-v="CALL" class="call on">CALL</button><button data-v="PUT" class="put">PUT</button></div>
+    <label style="margin-top:10px">Result</label>
+    <div class="seg" id="jRes"><button data-v="W" class="w">Jit</button><button data-v="L" class="l">Har</button><button data-v="D" class="d">Draw</button></div>
+    <label style="margin-top:10px">Signal-er dhoron</label>
+    <select id="jTag"><option>VALIDATED</option><option selected>UNPROVEN</option><option>NO BACKTEST</option><option>NIJER MOTO</option></select>
+    <button class="go" id="jAdd">Save</button>
+    <div class="err" id="jErr"></div>
+  </div>
+  <div class="card"><div id="jStats"></div></div>
+  <div class="card"><b>Shesh trade gulo</b><div id="jList" style="margin-top:6px"></div></div>
+</main>
+
+<nav>
+  <button data-t="signal" class="on">Signal</button>
+  <button data-t="bt">Backtest</button>
+  <button data-t="jr">Journal</button>
+</nav>
+
+<!-- ============ SETTINGS ============ -->
+<div class="panel hidden" id="settings">
+  <h2 style="margin:0">Setting</h2>
+  <label style="margin-top:14px">Twelve Data API Key (twelvedata.com)</label>
+  <input id="key" type="password" placeholder="API key paste koro" autocomplete="off">
+  <label style="margin-top:14px">Quotex payout (jemon 85)</label>
+  <input id="payout" type="number" min="50" max="100" inputmode="numeric">
+  <div class="chk"><input type="checkbox" id="fSess"><span>Shudhu London/New York shomoy-e signal (UTC 07:00-20:00, Mon-Fri)</span></div>
+  <div class="chk"><input type="checkbox" id="fTwo"><span>Kom-pokkhe 2 ta strategy ekmot hole tobei signal</span></div>
+  <div class="chk"><input type="checkbox" id="fVal"><span>Shudhu backtest-e PASS kora pair-er signal dekhao</span></div>
+  <div class="chk"><input type="checkbox" id="fSound"><span>Auto scan-e sound/vibration</span></div>
+  <label style="margin-top:18px"><b>Pro trader filter</b></label>
+  <div class="chk"><input type="checkbox" id="fRisk"><span>Risk guard: din-er limit-e pouchle signal bondho</span></div>
+  <div style="display:flex;gap:8px;margin-top:8px"><div style="flex:1"><label>Max har / din</label><input id="mLoss" type="number" inputmode="numeric"></div><div style="flex:1"><label>Max trade / din</label><input id="mTrades" type="number" inputmode="numeric"></div></div>
+  <div style="display:flex;gap:8px;margin-top:8px"><div style="flex:1"><label>Balance (optional)</label><input id="bal" type="number" inputmode="decimal"></div><div style="flex:1"><label>Risk % / trade</label><input id="riskPct" type="number" step="0.5" inputmode="decimal"></div></div>
+  <div class="chk"><input type="checkbox" id="fVol"><span>Volatility filter: market khub shanto ba khub choncol hole signal bondho</span></div>
+  <div class="chk"><input type="checkbox" id="fT15"><span>15 minute trend-er shathe mile tobei signal</span></div>
+  <div class="chk"><input type="checkbox" id="fAutoDis"><span>Journal-e pair-er live win rate kharap hole oi pair bondho</span></div>
+  <div style="display:flex;gap:8px;margin-top:8px"><div style="flex:1"><label>Koyta trade-er por</label><input id="adN" type="number" inputmode="numeric"></div><div style="flex:1"><label>Win rate % er niche</label><input id="adFloor" type="number" inputmode="numeric"></div></div>
+  <div class="mu sm" style="margin-top:8px;line-height:1.5">Volatility ar 15m trend filter on/off korle Backtest abar chalate hobe, noile PASS result purono dekhabe.</div>
+  <label style="margin-top:16px">Gemini API key (AI byakkha-r jonno, free: aistudio.google.com/apikey)</label>
+  <input id="gkey" type="password" placeholder="Gemini key (optional)" autocomplete="off">
+  <label style="margin-top:14px">Telegram bot token (optional, @BotFather theke)</label>
+  <input id="tgTok" type="password" placeholder="123456:ABC..." autocomplete="off">
+  <label style="margin-top:14px">Telegram chat id</label>
+  <input id="tgChat" type="text" inputmode="numeric" placeholder="123456789">
+  <div class="chk"><input type="checkbox" id="fAiTg"><span>Telegram alert-e AI byakkha-o pathao</span></div>
+  <button class="go g" id="tgTest">Telegram test message pathao</button>
+  <div class="mu sm" id="tgTestSt" style="margin-top:6px"></div>
+  <label style="margin-top:16px">Auto scan watchlist (max 8 ta pair)</label>
+  <div class="grid" id="watchGrid"></div>
+  <button class="go g" id="watchPass">Backtest PASS pair gulo watchlist-e nao</button>
+  <button class="go" id="save">Save</button>
+  <button class="go g" id="close">Bondho</button>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const LS={get:(k,d)=>{try{const v=localStorage.getItem(k);return v===null?d:v}catch(e){return d}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
+const J=(k,d)=>{try{const v=JSON.parse(LS.get(k,"null"));return v===null?d:v}catch(e){return d}};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const CCY=["EUR","GBP","AUD","NZD","USD","CAD","CHF","JPY"];
+const PAIRS=[];for(let i=0;i<CCY.length;i++)for(let j=i+1;j<CCY.length;j++)PAIRS.push(CCY[i]+"/"+CCY[j]);
+const NAMES=["RSI (30/70)","Bollinger Band","EMA 9/21 cross","Combo (2+ ekmot)"];
+const BASE=NAMES.slice(0,3);
+
+const cfg=Object.assign({key:LS.get("tdkey",""),payout:parseFloat(LS.get("payout","85"))||85,sess:true,two:false,valOnly:false,sound:true,watch:[],gkey:"",tgTok:"",tgChat:"",aiTg:false,vol:false,t15:false,autoDis:true,adN:10,adFloor:45,riskOn:true,maxLoss:3,maxTrades:10,balance:0,riskPct:1},J("cfg",{}));
+const saveCfg=()=>LS.set("cfg",JSON.stringify(cfg));
+let bt=J("bt",{}),journal=J("journal",[]);
+const be=()=>1/(1+cfg.payout/100);
+
+// ---------- Math / indicators ----------
+function wilson(w,n,z=1.96){if(!n)return 0;const p=w/n,d=1+z*z/n,c=p+z*z/(2*n),a=z*Math.sqrt((p*(1-p)+z*z/(4*n))/n);return (c-a)/d}
+function ema(a,n){const k=2/(n+1),o=[a[0]];for(let i=1;i<a.length;i++)o.push(a[i]*k+o[i-1]*(1-k));return o}
+function rsi(c,n=14){const o=new Array(c.length).fill(NaN);
+  for(let i=n;i<c.length;i++){let g=0,l=0;for(let j=i-n+1;j<=i;j++){const d=c[j]-c[j-1];if(d>0)g+=d;else l-=d}o[i]=l===0?100:100-100/(1+g/l)}return o}
+function bands(c,n=20,k=2){const m=[],s=[];
+  for(let i=0;i<c.length;i++){if(i<n-1){m.push(NaN);s.push(NaN);continue}
+    let sum=0;for(let j=i-n+1;j<=i;j++)sum+=c[j];const mu=sum/n;let v=0;for(let j=i-n+1;j<=i;j++)v+=(c[j]-mu)**2;
+    m.push(mu);s.push(Math.sqrt(v/(n-1)))}return {m,s,k}}
+function strategies(c){
+  const r=rsi(c),b=bands(c),e9=ema(c,9),e21=ema(c,21),S={};NAMES.forEach(n=>S[n]=[]);
+  for(let i=0;i<c.length;i++){
+    const a=isNaN(r[i])?0:r[i]<30?1:r[i]>70?-1:0;
+    const bb=isNaN(b.m[i])?0:c[i]<b.m[i]-b.k*b.s[i]?1:c[i]>b.m[i]+b.k*b.s[i]?-1:0;
+    const d=e9[i]-e21[i],pd=i?e9[i-1]-e21[i-1]:0;
+    const e=i&&d>0&&pd<=0?1:i&&d<0&&pd>=0?-1:0;
+    S[NAMES[0]].push(a);S[NAMES[1]].push(bb);S[NAMES[2]].push(e);
+    const up=(a===1)+(bb===1)+(e===1),dn=(a===-1)+(bb===-1)+(e===-1);
+    S[NAMES[3]].push(up>=2&&dn===0?1:dn>=2&&up===0?-1:0);
+  }
+  return S;
+}
+function inSession(ms){const d=new Date(ms),day=d.getUTCDay(),h=d.getUTCHours();return day>=1&&day<=5&&h>=7&&h<20}
+// ---- Pro filters: volatility (ATR) ar 15-minute trend
+function atrArr(h,l,c,n=14){const tr=[];for(let i=0;i<c.length;i++){const pc=i?c[i-1]:c[i];tr.push(Math.max(h[i]-l[i],Math.abs(h[i]-pc),Math.abs(l[i]-pc)))}
+  const a=new Array(c.length).fill(NaN);let s=0;for(let i=0;i<c.length;i++){s+=tr[i];if(i>=n)s-=tr[i-n];if(i>=n-1)a[i]=s/n}return a}
+function volRatio(h,l,c){const a=atrArr(h,l,c),r=new Array(c.length).fill(NaN);
+  for(let i=60;i<c.length;i++){let s=0,k=0;for(let j=Math.max(14,i-288);j<i;j++){if(!isNaN(a[j])){s+=a[j];k++}}if(k>=30&&s>0)r[i]=a[i]/(s/k)}return r}
+const volOk=r=>isNaN(r)||(r>=0.6&&r<=1.8);
+function tr15Arr(c,t){const idx=[],c15=[],out=new Array(c.length).fill(0);
+  for(let i=0;i<c.length;i++){if((t[i]+300000)%900000===0){idx.push(i);c15.push(c[i])}}
+  if(c15.length<25)return out;
+  const e9=ema(c15,9),e21=ema(c15,21);let k=-1;
+  for(let i=0;i<c.length;i++){while(k+1<idx.length&&idx[k+1]<=i)k++;if(k>=21)out[i]=Math.sign(e9[k]-e21[k])}return out}
+const flagsNow=()=>({sess:!!cfg.sess,vol:!!cfg.vol,t15:!!cfg.t15});
+function stat(sig,c,t,from,to,X){let n=0,w=0;
+  for(let i=from;i<to-1;i++){if(!sig[i])continue;if(cfg.sess&&!inSession(t[i]+300000))continue;
+    if(cfg.vol&&X&&!volOk(X.vr[i]))continue;
+    if(cfg.t15&&X&&X.t15[i]!==0&&sig[i]!==X.t15[i])continue;
+    const f=c[i+1]-c[i];if(f===0)continue;n++;if(sig[i]*f>0)w++}
+  return {n,w,wr:n?w/n:0,lb:wilson(w,n)}}
+function backtestPair(c,t,h,l){
+  const S=strategies(c),N=c.length,sp=Math.floor(60+(N-60)*0.6),res={};
+  const X={vr:(h&&l)?volRatio(h,l,c):new Array(N).fill(NaN),t15:tr15Arr(c,t)};
+  NAMES.forEach(n=>{const a=stat(S[n],c,t,60,sp,X),b=stat(S[n],c,t,sp,N,X);
+    res[n]={isN:a.n,isWr:a.wr,n:b.n,w:b.w,wr:b.wr,lb:b.lb,pass:b.n>=30&&b.lb>be()&&a.wr>be()}});
+  return res;
+}
+
+// ---------- Data (rate-limited) ----------
+let chain=Promise.resolve(),lastReq=0;
+function gate(){const p=chain.then(async()=>{const w=7600-(Date.now()-lastReq);if(w>0)await sleep(w);lastReq=Date.now()});chain=p.catch(()=>{});return p}
+function credit(){const d=new Date().toISOString().slice(0,10),c=J("cr",{d:"",n:0});return c.d===d?c:{d,n:0}}
+function bump(){const c=credit();c.n++;LS.set("cr",JSON.stringify(c));showCredit()}
+function showCredit(){$("credit").textContent=`Aajker API request: ${credit().n}/800 (free limit)`}
+async function td(pair,size){
+  await gate();bump();
+  const url=`https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(pair)}&interval=5min&outputsize=${size}&timezone=UTC&order=ASC&apikey=${encodeURIComponent(cfg.key)}`;
+  const r=await fetch(url),j=await r.json();
+  if(j.status==="error"||!j.values)throw new Error(j.message||"Data ashe ni");
+  const v=j.values.map(x=>({t:Date.parse(x.datetime.replace(" ","T")+"Z"),c:parseFloat(x.close),h:parseFloat(x.high),l:parseFloat(x.low)}));
+  if(v.length&&v[v.length-1].t+300000>Date.now())v.pop();
+  return v;
+}
+async function tdRetry(pair,size){
+  for(let k=0;k<3;k++){
+    try{return await td(pair,size)}
+    catch(e){const m=e.message||"";
+      if(/api ?key|apikey|invalid|unauthor/i.test(m))throw Object.assign(e,{fatal:true});
+      if(/credit|limit|minute/i.test(m)&&k<2){await sleep(61000);continue}
+      throw e}
+  }
+}
+
+// ---------- Live analysis ----------
+// ---- Risk guard + auto-disable
+const dayKey=ms=>new Date(ms).toDateString();
+function todayStats(){const k=dayKey(Date.now()),L=journal.filter(x=>dayKey(x.t)===k);
+  return {n:L.length,w:L.filter(x=>x.res==="W").length,l:L.filter(x=>x.res==="L").length}}
+function riskTripped(){if(!cfg.riskOn)return false;const s=todayStats();return s.l>=cfg.maxLoss||s.n>=cfg.maxTrades}
+function pairDisabled(pair){
+  const L=journal.filter(x=>x.pair===pair&&(x.res==="W"||x.res==="L")).slice(-20),n=L.length;
+  if(n<cfg.adN)return null;const w=L.filter(x=>x.res==="W").length,wr=w/n;
+  return wr<cfg.adFloor/100?{n,wr}:null}
+function paintRisk(){
+  const s=todayStats(),trip=riskTripped();
+  const card=$("riskCard");card.style.borderColor=trip?"var(--dn)":"var(--line)";
+  let t=cfg.riskOn?`Aj: ${s.n} trade (${s.w} jit, ${s.l} har) | limit: ${cfg.maxLoss} har ba ${cfg.maxTrades} trade`:"Risk guard bondho (Setting-e on koro)";
+  if(trip)t="RISK GUARD: Aj ar trade na. Kal abar. ("+t+")";
+  if(cfg.balance>0)t+=`\nProstabito amount: $${(cfg.balance*cfg.riskPct/100).toFixed(2)} (balance-er ${cfg.riskPct}%)`;
+  $("riskTxt").textContent=t;$("riskTxt").style.color=trip?"var(--dn)":"var(--mu)";
+}
+
+async function analyze(pair){
+  const v=await tdRetry(pair,300),c=v.map(x=>x.c);
+  if(c.length<60)throw new Error("Poryapto data nei");
+  const vrA=volRatio(v.map(x=>x.h),v.map(x=>x.l),c),t15A=tr15Arr(c,v.map(x=>x.t));
+  const L=c.length-1,since=(Date.now()-v[L].t)/60000-5,closeT=v[L].t+300000;
+  const S=strategies(c),e21=ema(c,21),e50=ema(c,50);
+  const trend=e21[L]>e50[L]&&e50[L]>e50[L-5]?1:e21[L]<e50[L]&&e50[L]<e50[L-5]?-1:0;
+  const trig=BASE.filter(n=>S[n][L]!==0),sum=trig.reduce((a,n)=>a+S[n][L],0),dir=Math.sign(sum);
+  const agree=trig.filter(n=>S[n][L]===dir);
+  const vrL=vrA[L],tr15=t15A[L],dis=pairDisabled(pair);
+  const b=bt[pair];let tag="NO BACKTEST";
+  if(b){const bf=b.flags||{sess:b.sess,vol:false,t15:false},cf=flagsNow();
+    const stale=bf.sess!==cf.sess||bf.vol!==cf.vol||bf.t15!==cf.t15;
+    const ok=agree.some(n=>b.res[n]&&b.res[n].pass)||(agree.length>=2&&b.res[NAMES[3]]&&b.res[NAMES[3]].pass);
+    tag=stale?"BACKTEST PURONO":ok?"VALIDATED":"UNPROVEN"}
+  let state="signal";
+  if(since>10)state="closed";
+  else if(!trig.length)state="none";
+  else if(sum===0)state="conflict";
+  else if(cfg.sess&&!inSession(closeT))state="session";
+  else if(cfg.vol&&!volOk(vrL))state="vol";
+  else if(cfg.two&&agree.length<2)state="two";
+  else if(cfg.t15&&tr15!==0&&dir!==tr15)state="t15";
+  else if(cfg.autoDis&&dis)state="disabled";
+  else if(cfg.valOnly&&tag!=="VALIDATED")state="unproven";
+  else if(riskTripped())state="risk";
+  const rs=rsi(c),bd=bands(c),ind={rsi:rs[L],bz:(c[L]-bd.m[L])/bd.s[L],e9:ema(c,9)[L],e21:e21[L]};
+  return {pair,c,v,L,S,trig,sum,dir,agree,trend,since,tag,state,closeT,ind,vrL,tr15,dis};
+}
+const hhmm=ms=>new Date(ms).toUTCString().slice(17,22);
+
+let lastSig=null;
+function render(r){
+  lastSig=r;
+  const {pair,c,L,S,dir,agree,trend,tag,state}=r;
+  $("out").classList.remove("hidden");
+  const box=$("sig");box.className="sig none";$("toJournal").classList.add("hidden");
+  $("aiBox").textContent="";$("aiBtn").classList.toggle("hidden",state==="closed");
+  const msg={
+    closed:["BAZAR BONDHO","Shesh candle "+Math.round(r.since)+" minute age-er. Mon-Fri e try koro."],
+    none:["NO SIGNAL","Ekhon kono strategy trigger kore ni. Trade korar dorkar nei."],
+    conflict:["CONFLICT","Strategy-gulo ulte dik dekhachche. Skip koro."],
+    session:["SESSION-er baire","Ekhon London/New York shomoy na, signal beshi fake hoy. Skip koro."],
+    two:["DURBOL SIGNAL","Shudhu 1 ta strategy trigger korechhe, 2 ta lagbe (filter on)."],
+    unproven:["PROMAN NEI","Ei pair-e backtest-e PASS kore ni (filter on). Skip koro."],
+    vol:["VOLATILITY FILTER","Market ekhon khub "+(r.vrL<1?"shanto":"choncol")+" (ATR "+(isNaN(r.vrL)?"-":r.vrL.toFixed(2))+"x). Skip koro."],
+    t15:["15m TREND-er BIRUDDHE","15 minute-er boro trend "+(r.tr15>0?"UP":"DOWN")+", signal ulte dike. Skip koro."],
+    disabled:["AUTO-BONDHO",r.dis?`Journal-e ei pair-er live win rate ${(r.dis.wr*100).toFixed(0)}% (${r.dis.n} trade). Ei pair-e ekhon trade na.`:""],
+    risk:["RISK GUARD","Aj-er har/trade limit hoye geche. Aj ar na, kal abar."]
+  };
+  if(state==="signal"){
+    const up=dir>0;box.className="sig "+(up?"call":"put");
+    $("sigTxt").textContent=up?"CALL (UP)":"PUT (DOWN)";
+    $("sigSub").textContent=`${pair} | Expiry 5 min | ${agree.length}/3 strategy ekmot`;
+    $("toJournal").classList.remove("hidden");
+  }else{$("sigTxt").textContent=msg[state][0];$("sigSub").textContent=msg[state][1]}
+  const tcls=tag==="VALIDATED"?"ok":(tag==="UNPROVEN"||tag==="BACKTEST PURONO")?"wn":"";
+  let rows=`<div class="row"><span class="mu">Pair / Price</span><span>${pair} &nbsp; ${c[L].toFixed(c[L]>20?3:5)}</span></div>`;
+  rows+=`<div class="row"><span class="mu">Backtest</span><span class="tag ${tcls}">${tag}</span></div>`;
+  rows+=`<div class="row"><span class="mu">Candle close</span><span>${hhmm(r.closeT)} UTC (${Math.max(0,Math.round(r.since))} min age)</span></div>`;
+  rows+=`<div class="row"><span class="mu">15m trend / Volatility</span><span>${r.tr15>0?"UP":r.tr15<0?"DOWN":"-"} / ${isNaN(r.vrL)?"-":r.vrL.toFixed(2)+"x"}${state==="signal"&&r.tr15!==0&&dir*r.tr15<0?' <span class="tag wn">15m-er biruddhe</span>':''}</span></div>`;
+  rows+=`<div class="row"><span class="mu">Trend (EMA)</span><span>${trend>0?"UP":trend<0?"DOWN":"SIDEWAYS"}${state==="signal"&&dir*trend<0?' <span class="tag wn">trend-er biruddhe</span>':''}</span></div>`;
+  BASE.forEach(n=>{
+    const s=S[n][L],x=bt[pair]&&bt[pair].res[n];
+    rows+=`<div class="row"><span>${n}<br><span class="mu sm">${x?`backtest: ${(x.wr*100).toFixed(0)}% (${x.w}/${x.n}) ${x.pass?"PASS":"fail"}`:"backtest hoy ni"}</span></span>
+    <span style="color:${s>0?'var(--up)':s<0?'var(--dn)':'var(--mu)'}">${s>0?"CALL":s<0?"PUT":"-"}</span></div>`;
+  });
+  rows+=`<div class="row"><span class="mu">Break-even win rate</span><span>${(be()*100).toFixed(1)}%</span></div>`;
+  if(cfg.balance>0&&state==="signal")rows+=`<div class="row"><span class="mu">Prostabito amount</span><span>$${(cfg.balance*cfg.riskPct/100).toFixed(2)}</span></div>`;
+  $("rows").innerHTML=rows;
+}
+
+// ---------- Tabs / basic UI ----------
+PAIRS.forEach(p=>{["pair","jPair"].forEach(id=>{const o=document.createElement("option");o.value=p;o.textContent=p;$(id).appendChild(o)})});
+$("pair").value=LS.get("pair","EUR/USD");$("pair").onchange=()=>LS.set("pair",$("pair").value);
+function showTab(t){["signal","bt","jr"].forEach(x=>$("tab-"+x).classList.toggle("hidden",x!==t));
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));
+  if(t==="bt")paintBt();if(t==="jr")paintJournal();}
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>showTab(b.dataset.t));
+function updBE(){$("be").textContent=(be()*100).toFixed(1)+"%"}
+
+function needKey(){if(!cfg.key){openSettings();$("err").textContent="Age API key boshao (Setting).";return true}return false}
+
+$("go").onclick=async()=>{
+  $("err").textContent="";if(needKey())return;
+  $("go").disabled=true;$("go").textContent="Analysis cholche...";
+  try{render(await analyze($("pair").value))}catch(e){$("err").textContent="Error: "+e.message}
+  $("go").disabled=false;$("go").textContent="Signal dao";
+};
+$("toJournal").onclick=()=>{
+  if(!lastSig)return;$("jPair").value=lastSig.pair;
+  setSeg("jDir",lastSig.dir>0?"CALL":"PUT");$("jTag").value=lastSig.tag;showTab("jr");
+};
+
+// ---------- Manual scan ----------
+let scanning=false,stopScan=false;const results={};
+function paintScan(done,errs,note){
+  const all=Object.values(results);
+  const sigs=all.filter(r=>r.state==="signal").sort((a,b)=>b.agree.length-a.agree.length||a.since-b.since);
+  const cnt=s=>all.filter(r=>r.state===s).length;
+  let h=`<div class="mu sm" style="margin-bottom:6px">${note||""}</div><div class="mu sm" style="margin-bottom:6px">Check: ${done}/${PAIRS.length} | Signal: ${sigs.length} | No signal: ${cnt("none")} | Conflict: ${cnt("conflict")} | Filter-e bad: ${cnt("session")+cnt("vol")+cnt("two")+cnt("t15")+cnt("disabled")+cnt("unproven")+cnt("risk")} | Error: ${errs}</div>`;
+  if(!sigs.length)h+=`<div class="mu" style="padding:10px 0">Ekhono kono pair-e signal nei.</div>`;
+  sigs.forEach(r=>{const up=r.dir>0,late=r.since>3,tc=r.tag==="VALIDATED"?"ok":r.tag==="UNPROVEN"?"wn":"";
+    h+=`<div class="item" data-p="${r.pair}"><div><b>${r.pair}</b> <span class="tag ${tc}">${r.tag}</span>${late?' <span class="tag wn">LATE</span>':''}<br>
+    <span class="mu sm">${r.agree.length}/3 ekmot | trend ${r.trend>0?"UP":r.trend<0?"DOWN":"SIDE"}${r.dir*r.trend<0?" (biruddhe)":""} | close ${hhmm(r.closeT)} UTC</span></div>
+    <div class="side ${up?'call':'put'}">${up?"CALL":"PUT"}</div></div>`});
+  $("scanList").innerHTML=h;
+  document.querySelectorAll("#scanList .item").forEach(el=>el.onclick=()=>{const r=results[el.dataset.p];if(r){$("pair").value=r.pair;render(r);window.scrollTo({top:0});$("tab-signal").scrollTo({top:0,behavior:"smooth"})}});
+}
+$("scan").onclick=async()=>{
+  if(scanning){stopScan=true;return}
+  $("err").textContent="";if(needKey())return;
+  scanning=true;stopScan=false;$("scan").textContent="Stop scan";$("scanBox").classList.remove("hidden");
+  Object.keys(results).forEach(k=>delete results[k]);
+  let done=0,errs=0,fatal="",closed=false;
+  for(const p of PAIRS){
+    if(stopScan)break;paintScan(done,errs,`Scan cholche: ${p} (~4 minute)`);
+    try{const r=await analyze(p);results[p]=r;if(r.state==="closed")closed=true}
+    catch(e){if(e.fatal){fatal="API key thik na: "+e.message;break}errs++}
+    done++;if(closed)break;
+  }
+  paintScan(done,errs,fatal||(closed?"Bazar bondho (weekend). Mon-Fri e try koro.":stopScan?"Scan thamano hoyeche.":"Scan shesh. Pair-e tap korle details dekhabe. LATE hole abar scan koro."));
+  scanning=false;$("scan").textContent="Scan all pairs (28)";
+};
+
+// ---------- Backtest tab ----------
+function paintBt(){
+  const keys=Object.keys(bt);$("btBox").classList.toggle("hidden",!keys.length);if(!keys.length)return;
+  const rows=keys.map(p=>{const res=bt[p].res;let best=NAMES[0];NAMES.forEach(n=>{if(res[n].lb>res[best].lb)best=n});
+    return {p,res,best,anyPass:NAMES.some(n=>res[n].pass)}})
+   .sort((a,b)=>(b.anyPass-a.anyPass)||(b.res[b.best].lb-a.res[a.best].lb));
+  const np=rows.filter(r=>r.anyPass).length,cf=flagsNow();
+  const stale=keys.some(p=>{const bf=bt[p].flags||{sess:bt[p].sess,vol:false,t15:false};return bf.sess!==cf.sess||bf.vol!==cf.vol||bf.t15!==cf.t15});
+  let h=`<div class="mu sm" style="margin-bottom:8px">PASS: ${np}/${rows.length} pair | Break-even: ${(be()*100).toFixed(1)}%</div>`;
+  if(stale)h+=`<div class="warn" style="margin:0 0 10px">Filter setting bodleche, tai ei result purono. Abar Backtest chalao.</div>`;
+  rows.forEach(r=>{const x=r.res[r.best];
+    h+=`<details><summary><span><b>${r.p}</b><br><span class="mu sm">${r.best}: ${(x.wr*100).toFixed(0)}% (${x.w}/${x.n})</span></span><span class="tag ${r.anyPass?"ok":""}">${r.anyPass?"PASS":"NO"}</span></summary>
+    <div style="margin-top:8px">${NAMES.map(n=>{const y=r.res[n];return `<div class="row"><span>${n}<br><span class="mu sm">shikhar shomoy: ${(y.isWr*100).toFixed(0)}% (${y.isN} trade)</span></span><span style="text-align:right">${(y.wr*100).toFixed(1)}% (${y.w}/${y.n})<br><span class="mu sm">lower95: ${(y.lb*100).toFixed(0)}% ${y.pass?"PASS":"fail"}</span></span></div>`}).join("")}</div></details>`});
+  $("btList").innerHTML=h;
+}
+let btRun=false,btStop=false;
+$("btAll").onclick=async()=>{
+  if(btRun){btStop=true;return}
+  if(!cfg.key){openSettings();return}
+  btRun=true;btStop=false;$("btAll").textContent="Stop backtest";
+  let done=0,errs=0,fatal="";
+  for(const p of PAIRS){
+    if(btStop)break;$("btProg").textContent=`Backtest cholche: ${p} (${done}/${PAIRS.length})`;
+    try{const v=await tdRetry(p,5000);if(v.length<800)throw new Error("Kom data");
+      bt[p]={ts:Date.now(),candles:v.length,sess:cfg.sess,flags:flagsNow(),res:backtestPair(v.map(x=>x.c),v.map(x=>x.t),v.map(x=>x.h),v.map(x=>x.l))};LS.set("bt",JSON.stringify(bt));paintBt()}
+    catch(e){if(e.fatal){fatal="API key thik na: "+e.message;break}errs++}
+    done++;
+  }
+  $("btProg").textContent=fatal||`Shesh. ${done} pair check hoyeche, error: ${errs}.`;
+  btRun=false;$("btAll").textContent="Backtest all pairs (28)";paintBt();
+};
+
+// ---------- Journal ----------
+function setSeg(id,v){document.querySelectorAll("#"+id+" button").forEach(b=>b.classList.toggle("on",b.dataset.v===v))}
+function getSeg(id){const b=document.querySelector("#"+id+" button.on");return b?b.dataset.v:null}
+["jDir","jRes"].forEach(id=>document.querySelectorAll("#"+id+" button").forEach(b=>b.onclick=()=>setSeg(id,b.dataset.v)));
+function jStats(list){const w=list.filter(x=>x.res==="W").length,l=list.filter(x=>x.res==="L").length,n=w+l;
+  return {n,w,l,wr:n?w/n:0,lb:wilson(w,n),net:w*cfg.payout/100-l}}
+function paintJournal(){
+  const s=jStats(journal),b=be();
+  let verdict="";
+  if(s.n<30)verdict=`Ekhono khub kom trade (${s.n}). Kom-pokkhe 200 ta dorkar, tar age kono shiddhanto na.`;
+  else if(s.lb>b)verdict="Win rate break-even-er upore, 95% confidence-e. Bhalo lokkhon.";
+  else if(s.wr>b)verdict="Break-even-er upore, kintu ekhono nishchit na. Aro trade korte thako.";
+  else verdict="Break-even-er niche. Ei obosthay real taka diyo na.";
+  const grp=t=>jStats(journal.filter(x=>x.tag===t));
+  const gv=grp("VALIDATED"),gu=grp("UNPROVEN");
+  const pc=x=>x.n?`${(x.wr*100).toFixed(0)}% (${x.w}/${x.n})`:"-";
+  $("jStats").innerHTML=`<div class="mu sm">Win rate (Jit/Har, draw bad)</div>
+  <div class="stat" style="color:${s.n&&s.wr>b?'var(--up)':'var(--tx)'}">${s.n?(s.wr*100).toFixed(1)+"%":"-"}</div>
+  <div class="mu sm">${s.w} jit, ${s.l} har | break-even ${(b*100).toFixed(1)}% | 1 unit/trade-e ${s.net>=0?"+":""}${s.net.toFixed(1)} unit</div>
+  <div style="margin:10px 0;font-size:14px;line-height:1.5">${verdict}</div>
+  <div class="row"><span class="mu">VALIDATED signal</span><span>${pc(gv)}</span></div>
+  <div class="row"><span class="mu">UNPROVEN signal</span><span>${pc(gu)}</span></div>`+
+  (()=>{const bp={};journal.forEach(x=>{if(x.res==="D")return;(bp[x.pair]=bp[x.pair]||[]).push(x)});
+    const ks=Object.keys(bp);if(!ks.length)return"";
+    return `<div class="mu sm" style="margin-top:12px">Pair onujayi (live)</div>`+ks.map(p=>{const q=jStats(bp[p]),d=pairDisabled(p);
+      return `<div class="row"><span>${p}</span><span>${(q.wr*100).toFixed(0)}% (${q.w}/${q.n}) ${d?'<span class="tag wn">AUTO-BONDHO</span>':''}</span></div>`}).join("")})();
+  $("jList").innerHTML=journal.length?journal.slice().reverse().slice(0,30).map((x,i)=>{const idx=journal.length-1-i;
+    return `<div class="row"><span>${x.pair} ${x.dir} <span class="tag">${x.tag}</span><br><span class="mu sm">${new Date(x.t).toLocaleString()}</span></span>
+    <span style="text-align:right;color:${x.res==="W"?'var(--up)':x.res==="L"?'var(--dn)':'var(--mu)'}">${x.res==="W"?"Jit":x.res==="L"?"Har":"Draw"}<br><button class="icon" style="padding:2px 8px;margin-top:4px" data-del="${idx}">x</button></span></div>`}).join(""):`<div class="mu sm">Ekhono kono trade nei.</div>`;
+  document.querySelectorAll("[data-del]").forEach(el=>el.onclick=()=>{journal.splice(+el.dataset.del,1);LS.set("journal",JSON.stringify(journal));paintJournal();paintRisk()});
+}
+$("jAdd").onclick=()=>{
+  const dir=getSeg("jDir"),res=getSeg("jRes");
+  if(!res){$("jErr").textContent="Jit/Har/Draw select koro.";return}
+  $("jErr").textContent="";
+  journal.push({t:Date.now(),pair:$("jPair").value,dir,res,tag:$("jTag").value});
+  LS.set("journal",JSON.stringify(journal));
+  document.querySelectorAll("#jRes button").forEach(b=>b.classList.remove("on"));paintJournal();paintRisk();
+};
+
+// ---------- Telegram + AI byakkha ----------
+async function tgSend(text){
+  if(!cfg.tgTok||!cfg.tgChat)return false;
+  try{
+    const r=await fetch(`https://api.telegram.org/bot${encodeURIComponent(cfg.tgTok)}/sendMessage`,
+      {method:"POST",body:new URLSearchParams({chat_id:cfg.tgChat,text:text.slice(0,4000)})});
+    const j=await r.json();return !!j.ok;
+  }catch(e){return false}
+}
+async function explain(r){
+  if(!cfg.gkey)throw new Error("Setting-e Gemini API key dao");
+  const b=bt[r.pair],js=jStats(journal);
+  const strat=BASE.map(n=>{const x=b&&b.res[n];return {strategy:n,signal:r.S[n][r.L]===1?"CALL":r.S[n][r.L]===-1?"PUT":"kono signal nei",
+    backtest:x?`${(x.wr*100).toFixed(0)}% jit (${x.w}/${x.n} trade), ${x.pass?"PASS":"fail"}`:"backtest hoy ni"}});
+  const data={pair:r.pair,signal:r.dir>0?"CALL":r.dir<0?"PUT":"nei",app_state:r.state,backtest_tag:r.tag,
+    rsi:+r.ind.rsi.toFixed(1),bollinger_zscore:+r.ind.bz.toFixed(2),ema9_vs_ema21:r.ind.e9>r.ind.e21?"EMA9 upore":"EMA9 niche",
+    trend:r.trend>0?"UP":r.trend<0?"DOWN":"SIDEWAYS",minutes_since_candle_close:Math.max(0,Math.round(r.since)),
+    strategies:strat,break_even_win_rate_pct:+(be()*100).toFixed(1),
+    my_journal:{trades:js.n,win_rate_pct:js.n?+(js.wr*100).toFixed(1):null}};
+  const sys=`Tumi ekjon shotto, shohoj bhashar trading shikkhok. Niche-r JSON data (ekta 5-minute forex binary signal) dekhe Banglish-e (Bangla kotha, English okkhore) 5-7 line-e bujhao:
+1) kon indicator ki bolche ar keno CALL/PUT ashche (ba keno signal nei),
+2) signal trend-er shathe mele kina,
+3) backtest ar user-er journal data ki bole,
+4) shesh-e ekta shotto warning: 5 minute-er trade-e result prai random, kono guarantee nei, eta financial advice na.
+Shudhu data theke bolo, kichu banabe na, ar je tothyo data-te nei seta bolo na. "Entry nao" ba "nishchit jitbe" dhoroner kotha bolo na.`;
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(cfg.gkey)}`;
+  const resp=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({system_instruction:{parts:[{text:sys}]},contents:[{role:"user",parts:[{text:JSON.stringify(data)}]}]})});
+  const j=await resp.json();
+  const t=j&&j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts&&j.candidates[0].content.parts[0]&&j.candidates[0].content.parts[0].text;
+  if(!t)throw new Error((j&&j.error&&j.error.message)||"AI uttor dey ni");
+  return t.trim();
+}
+$("aiBtn").onclick=async()=>{
+  if(!lastSig)return;$("aiBtn").disabled=true;$("aiBtn").textContent="AI bhabche...";
+  try{$("aiBox").textContent=await explain(lastSig)}catch(e){$("aiBox").textContent="Shomoshya: "+e.message}
+  $("aiBtn").disabled=false;$("aiBtn").textContent="AI byakkha (Gemini)";
+};
+$("tgTest").onclick=async()=>{
+  cfg.tgTok=$("tgTok").value.trim();cfg.tgChat=$("tgChat").value.trim();
+  $("tgTestSt").textContent="Pathacchi...";
+  const ok=await tgSend("FX Signal: Telegram connection thik ache.");
+  $("tgTestSt").textContent=ok?"Pathano hoyeche. Telegram check koro.":"Pathano jay ni. Token/chat id check koro, ar bot-ke age /start pathao.";
+};
+
+// ---------- Auto scan + alerts ----------
+let autoOn=false,wake=null,ac=null;const alerts=[];
+function beep(){if(!cfg.sound)return;try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),g=ac.createGain();o.connect(g);g.connect(ac.destination);o.frequency.value=880;g.gain.value=.25;o.start();o.stop(ac.currentTime+.45)}catch(e){}if(cfg.sound&&navigator.vibrate)navigator.vibrate([300,120,300])}
+function notify(r){
+  beep();
+  const txt=`${r.dir>0?"CALL":"PUT"} ${r.pair} (${r.tag})`;
+  alerts.unshift(`${hhmm(Date.now())} UTC: ${txt}`);if(alerts.length>15)alerts.pop();
+  $("alertBox").classList.remove("hidden");
+  $("alertList").innerHTML=alerts.map(a=>`<div class="row"><span>${a}</span></div>`).join("");
+  if("Notification" in window&&Notification.permission==="granted"){
+    try{navigator.serviceWorker.ready.then(reg=>reg.showNotification("FX Signal",{body:txt,vibrate:[300,100,300]}))}catch(e){try{new Notification("FX Signal",{body:txt})}catch(_){}}
+  }
+  results[r.pair]=r;
+  const tgMsg=`${r.dir>0?"CALL (UP)":"PUT (DOWN)"} ${r.pair}\n${r.tag} | Expiry 5 min\nCandle close: ${hhmm(r.closeT)} UTC (${Math.max(0,Math.round(r.since))} min age)\nTrend: ${r.trend>0?"UP":r.trend<0?"DOWN":"SIDEWAYS"}${r.dir*r.trend<0?" (signal trend-er biruddhe)":""}\nStrategy: ${r.agree.join(", ")}\nBreak-even: ${(be()*100).toFixed(1)}%\n\nShudhu DEMO-te. Guarantee nei.`;
+  (async()=>{let m=tgMsg;if(cfg.aiTg&&cfg.gkey){try{m+="\n\nAI byakkha:\n"+await explain(r)}catch(e){}}await tgSend(m)})();
+}
+async function lockScreen(){try{if("wakeLock" in navigator)wake=await navigator.wakeLock.request("screen")}catch(e){}}
+document.addEventListener("visibilitychange",()=>{if(autoOn&&document.visibilityState==="visible")lockScreen()});
+async function autoLoop(){
+  while(autoOn){
+    const wl=cfg.watch.length?cfg.watch:["EUR/USD","GBP/USD","USD/JPY"];
+    // porer 5-minute candle porjonto opekkha
+    const now=new Date(),next=new Date(now);next.setUTCMinutes(Math.floor(now.getUTCMinutes()/5)*5+5,6,0);
+    while(autoOn&&Date.now()<next.getTime()){$("autoSt").textContent=`Auto scan cholche (${wl.length} pair). Porer scan: ${Math.max(0,Math.round((next-Date.now())/1000))}s. App khola rakho.`;await sleep(1000)}
+    if(!autoOn)break;
+    if(credit().n>=780){$("autoSt").textContent="Din-er API limit prai shesh. Auto scan bondho.";break}
+    if(riskTripped()){
+      $("autoSt").textContent="RISK GUARD: aj-er limit hoye geche, scan hocche na. Kal abar.";
+      if(LS.get("riskTg","")!==new Date().toDateString()){LS.set("riskTg",new Date().toDateString());tgSend("RISK GUARD: Aj-er har/trade limit hoye geche. Aj ar signal pathabo na.")}
+      continue}
+    for(const p of wl){
+      if(!autoOn)break;$("autoSt").textContent=`Scan: ${p}...`;
+      try{const r=await analyze(p);if(r.state==="signal"&&r.since<=4)notify(r)}
+      catch(e){if(e.fatal){$("autoSt").textContent="API key thik na.";autoOn=false;break}}
+    }
+  }
+  autoOn=false;$("autoBtn").textContent="Auto scan: BONDHO";$("autoBtn").classList.add("g");try{wake&&wake.release()}catch(e){}
+}
+$("autoBtn").onclick=async()=>{
+  if(autoOn){autoOn=false;$("autoSt").textContent="Auto scan bondho kora hochhe...";return}
+  if(needKey())return;
+  if("Notification" in window&&Notification.permission==="default"){try{await Notification.requestPermission()}catch(e){}}
+  try{ac=ac||new (window.AudioContext||window.webkitAudioContext)()}catch(e){}
+  autoOn=true;$("autoBtn").textContent="Auto scan: CHALU (tap kore bondho)";$("autoBtn").classList.remove("g");
+  await lockScreen();autoLoop();
+};
+
+// ---------- Settings ----------
+function paintWatch(){
+  $("watchGrid").innerHTML=PAIRS.map(p=>`<label class="pill"><input type="checkbox" value="${p}" ${cfg.watch.includes(p)?"checked":""}>${p}</label>`).join("");
+  document.querySelectorAll("#watchGrid input").forEach(i=>i.onchange=()=>{
+    const sel=[...document.querySelectorAll("#watchGrid input:checked")];
+    if(sel.length>8){i.checked=false;alert("Max 8 ta pair (free API limit-er jonno)")}});
+}
+function openSettings(){
+  $("key").value=cfg.key;$("payout").value=cfg.payout;$("fSess").checked=cfg.sess;$("fTwo").checked=cfg.two;
+  $("fVal").checked=cfg.valOnly;$("fSound").checked=cfg.sound;
+  $("gkey").value=cfg.gkey;$("tgTok").value=cfg.tgTok;$("tgChat").value=cfg.tgChat;$("fAiTg").checked=cfg.aiTg;$("tgTestSt").textContent="";
+  $("fRisk").checked=cfg.riskOn;$("mLoss").value=cfg.maxLoss;$("mTrades").value=cfg.maxTrades;$("bal").value=cfg.balance||"";$("riskPct").value=cfg.riskPct;
+  $("fVol").checked=cfg.vol;$("fT15").checked=cfg.t15;$("fAutoDis").checked=cfg.autoDis;$("adN").value=cfg.adN;$("adFloor").value=cfg.adFloor;
+  paintWatch();$("settings").classList.remove("hidden");
+}
+$("gear").onclick=openSettings;$("close").onclick=()=>$("settings").classList.add("hidden");
+$("watchPass").onclick=()=>{
+  const ps=Object.keys(bt).filter(p=>NAMES.some(n=>bt[p].res[n].pass)).slice(0,8);
+  if(!ps.length){alert("Kono pair backtest-e PASS kore ni (ba backtest cholano hoy ni).");return}
+  cfg.watch=ps;paintWatch();
+};
+$("save").onclick=()=>{
+  cfg.key=$("key").value.trim();cfg.payout=parseFloat($("payout").value)||85;
+  cfg.sess=$("fSess").checked;cfg.two=$("fTwo").checked;cfg.valOnly=$("fVal").checked;cfg.sound=$("fSound").checked;
+  cfg.gkey=$("gkey").value.trim();cfg.tgTok=$("tgTok").value.trim();cfg.tgChat=$("tgChat").value.trim();cfg.aiTg=$("fAiTg").checked;
+  cfg.riskOn=$("fRisk").checked;cfg.maxLoss=parseInt($("mLoss").value)||3;cfg.maxTrades=parseInt($("mTrades").value)||10;
+  cfg.balance=parseFloat($("bal").value)||0;cfg.riskPct=parseFloat($("riskPct").value)||1;
+  cfg.vol=$("fVol").checked;cfg.t15=$("fT15").checked;cfg.autoDis=$("fAutoDis").checked;
+  cfg.adN=parseInt($("adN").value)||10;cfg.adFloor=parseFloat($("adFloor").value)||45;
+  cfg.watch=[...document.querySelectorAll("#watchGrid input:checked")].map(i=>i.value);
+  saveCfg();LS.set("tdkey",cfg.key);LS.set("payout",String(cfg.payout));updBE();paintRisk();paintBt();$("settings").classList.add("hidden");
+};
+
+updBE();showCredit();paintRisk();
+if(!cfg.key)setTimeout(openSettings,300);
+if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").catch(()=>{})}
+</script>
+</body>
+</html>
